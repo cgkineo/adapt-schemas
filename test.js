@@ -7,8 +7,10 @@ import { fileURLToPath } from 'url'
 import fs from 'fs/promises'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const hasSpecifiedPath = Boolean(process.argv[2])
 
 async function setupTestSchemas() {
+  if (hasSpecifiedPath) return
   // Create test schema directory
   const testSchemaDir = path.join(__dirname, 'test-schemas')
   await fs.mkdir(testSchemaDir, { recursive: true })
@@ -46,7 +48,10 @@ async function setupTestSchemas() {
                     "type": "string",
                     "default": "Skip navigation"
                   }
-                }
+                },
+                "required": [
+                  "skipNavigationText"
+                ]
               },
               "_extensions": {
                 "type": "object",
@@ -164,7 +169,9 @@ async function setupTestSchemas() {
 async function runTests() {
   console.log('=== Adapt Schema Library Tests ===\n')
 
-  const testSchemaDir = await setupTestSchemas()
+  const testSchemaDir =  hasSpecifiedPath
+    ? path.join(__dirname, process.argv[2])
+    : await setupTestSchemas()
 
   try {
     // Test 1: Initialize library
@@ -215,6 +222,7 @@ async function runTests() {
     try {
       await library.validate('course', {
         // Missing required title - disable defaults to trigger required error
+        _globals: { _accessibility: {} }
       }, { useDefaults: false, ignoreRequired: false })
       console.log('  ✗ Should have thrown validation error\n')
     } catch (e) {
@@ -272,6 +280,7 @@ async function runTests() {
     console.log('=== All tests passed! ===')
 
   } finally {
+    if (hasSpecifiedPath) return
     // Cleanup
     await fs.rm(testSchemaDir, { recursive: true, force: true })
   }
