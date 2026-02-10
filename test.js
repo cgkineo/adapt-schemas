@@ -9,7 +9,7 @@ import fs from 'fs/promises'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const hasSpecifiedPath = Boolean(process.argv[2])
 
-async function setupTestSchemas() {
+async function setupTestSchemas () {
   if (hasSpecifiedPath) return
   // Create test schema directory
   const testSchemaDir = path.join(__dirname, 'test-schemas')
@@ -17,51 +17,51 @@ async function setupTestSchemas() {
 
   // Create a course schema with _globals
   const courseSchema = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$anchor": "course",
-    "$merge": {
-      "source": { "$ref": "base" },
-      "with": {
-        "properties": {
-          "title": {
-            "type": "string",
-            "description": "Course title",
-            "default": "Untitled Course"
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $anchor: 'course',
+    $merge: {
+      source: { $ref: 'base' },
+      with: {
+        properties: {
+          title: {
+            type: 'string',
+            description: 'Course title',
+            default: 'Untitled Course'
           },
-          "description": {
-            "type": "string",
-            "description": "Course description",
-            "default": ""
+          description: {
+            type: 'string',
+            description: 'Course description',
+            default: ''
           },
-          "_globals": {
-            "type": "object",
-            "description": "Global settings",
-            "properties": {
-              "_accessibility": {
-                "type": "object",
-                "properties": {
-                  "_isEnabled": {
-                    "type": "boolean",
-                    "default": true
+          _globals: {
+            type: 'object',
+            description: 'Global settings',
+            properties: {
+              _accessibility: {
+                type: 'object',
+                properties: {
+                  _isEnabled: {
+                    type: 'boolean',
+                    default: true
                   },
-                  "skipNavigationText": {
-                    "type": "string",
-                    "default": "Skip navigation"
+                  skipNavigationText: {
+                    type: 'string',
+                    default: 'Skip navigation'
                   }
                 },
-                "required": [
-                  "skipNavigationText"
+                required: [
+                  'skipNavigationText'
                 ]
               },
-              "_extensions": {
-                "type": "object",
-                "properties": {
-                  "_trickle": {
-                    "type": "object",
-                    "properties": {
-                      "incompleteContent": {
-                        "type": "string",
-                        "default": "There is incomplete content above"
+              _extensions: {
+                type: 'object',
+                properties: {
+                  _trickle: {
+                    type: 'object',
+                    properties: {
+                      incompleteContent: {
+                        type: 'string',
+                        default: 'There is incomplete content above'
                       }
                     }
                   }
@@ -70,31 +70,31 @@ async function setupTestSchemas() {
             }
           }
         },
-        "required": ["title"]
+        required: ['title']
       }
     }
   }
 
   // Create a content schema
   const contentSchema = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$anchor": "content",
-    "$merge": {
-      "source": { "$ref": "base" },
-      "with": {
-        "properties": {
-          "_type": {
-            "type": "string",
-            "description": "Content type"
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $anchor: 'content',
+    $merge: {
+      source: { $ref: 'base' },
+      with: {
+        properties: {
+          _type: {
+            type: 'string',
+            description: 'Content type'
           },
-          "body": {
-            "type": "string",
-            "description": "Content body",
-            "default": ""
+          body: {
+            type: 'string',
+            description: 'Content body',
+            default: ''
           },
-          "_isOptional": {
-            "type": "boolean",
-            "default": false
+          _isOptional: {
+            type: 'boolean',
+            default: false
           }
         }
       }
@@ -103,39 +103,39 @@ async function setupTestSchemas() {
 
   // Create a component schema that extends content
   const componentSchema = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$anchor": "component",
-    "$merge": {
-      "source": { "$ref": "content" },
-      "with": {
-        "properties": {
-          "_component": {
-            "type": "string",
-            "description": "Component type"
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $anchor: 'component',
+    $merge: {
+      source: { $ref: 'content' },
+      with: {
+        properties: {
+          _component: {
+            type: 'string',
+            description: 'Component type'
           }
         },
-        "required": ["_component"]
+        required: ['_component']
       }
     }
   }
 
   // Create a patch schema that extends course
   const coursePatchSchema = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$anchor": "course-extension",
-    "$patch": {
-      "source": { "$ref": "course" },
-      "with": {
-        "properties": {
-          "_globals": {
-            "type": "object",
-            "properties": {
-              "_myPlugin": {
-                "type": "object",
-                "properties": {
-                  "buttonLabel": {
-                    "type": "string",
-                    "default": "Click me"
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $anchor: 'course-extension',
+    $patch: {
+      source: { $ref: 'course' },
+      with: {
+        properties: {
+          _globals: {
+            type: 'object',
+            properties: {
+              _myPlugin: {
+                type: 'object',
+                properties: {
+                  buttonLabel: {
+                    type: 'string',
+                    default: 'Click me'
                   }
                 }
               }
@@ -166,10 +166,10 @@ async function setupTestSchemas() {
   return testSchemaDir
 }
 
-async function runTests() {
+async function runTests () {
   console.log('=== Adapt Schema Library Tests ===\n')
 
-  const testSchemaDir =  hasSpecifiedPath
+  const testSchemaDir = hasSpecifiedPath
     ? path.join(__dirname, process.argv[2])
     : await setupTestSchemas()
 
@@ -179,7 +179,7 @@ async function runTests() {
     const library = new Schemas({
       enableCache: true,
       directoryReplacements: {
-        '$ROOT': process.cwd()
+        $ROOT: process.cwd()
       }
     })
     await library.init()
@@ -202,12 +202,12 @@ async function runTests() {
     // Test 4: Get defaults
     console.log('Test 4: Get schema defaults')
     const courseDefaults = await library.getSchemaDefaults('course')
-    console.log(`  ✓ Course defaults:`, JSON.stringify(courseDefaults, null, 4).split('\n').map(l => '    ' + l).join('\n'), '\n')
+    console.log('  ✓ Course defaults:', JSON.stringify(courseDefaults, null, 4).split('\n').map(l => '    ' + l).join('\n'), '\n')
 
     // Test 5: Get _globals defaults
     console.log('Test 5: Get _globals defaults')
     const globalsDefaults = await library.getGlobalsDefaults('course')
-    console.log(`  ✓ _globals defaults:`, JSON.stringify(globalsDefaults, null, 4).split('\n').map(l => '    ' + l).join('\n'), '\n')
+    console.log('  ✓ _globals defaults:', JSON.stringify(globalsDefaults, null, 4).split('\n').map(l => '    ' + l).join('\n'), '\n')
 
     // Test 6: Validate data
     console.log('Test 6: Validate data')
@@ -234,7 +234,7 @@ async function runTests() {
     console.log('Test 7b: Type validation error')
     try {
       await library.validate('course', {
-        title: 12345  // Should be string, not number
+        title: 12345 // Should be string, not number
       })
       console.log('  ✗ Should have thrown validation error\n')
     } catch (e) {
@@ -267,18 +267,17 @@ async function runTests() {
     // Create another test schema to trigger the event
     const newSchemaPath = path.join(testSchemaDir, 'test-event.schema.json')
     await fs.writeFile(newSchemaPath, JSON.stringify({
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$anchor": "test-event",
-      "$merge": {
-        "source": { "$ref": "base" },
-        "with": { "properties": { "test": { "type": "string" } } }
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      $anchor: 'test-event',
+      $merge: {
+        source: { $ref: 'base' },
+        with: { properties: { test: { type: 'string' } } }
       }
     }))
     await library.registerSchema(newSchemaPath)
     console.log('')
 
     console.log('=== All tests passed! ===')
-
   } finally {
     if (hasSpecifiedPath) return
     // Cleanup
