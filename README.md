@@ -43,11 +43,7 @@ const library = new Schemas({
   enableCache: true,              // Enable schema build caching (default: true)
   xssWhitelist: {},               // Custom XSS whitelist tags/attributes
   xssWhitelistOverride: false,    // Replace defaults instead of extending
-  formatOverrides: {},            // Custom string format RegExp patterns
-  directoryReplacements: {        // Replacements for isDirectory keyword
-    '$ROOT': '/app',
-    '$DATA': '/app/data'
-  }
+  formatOverrides: {}             // Custom string format RegExp patterns
 })
 ```
 
@@ -153,7 +149,7 @@ Manually extends a schema with another.
 library.extendSchema('course', 'my-course-extension')
 ```
 
-##### `addKeyword(definition)`
+##### `addKeyword(definition, options)`
 Adds a custom AJV keyword.
 
 ```javascript
@@ -162,6 +158,20 @@ library.addKeyword({
   type: 'number',
   validate: (schema, data) => data > 0
 })
+
+// Override an existing keyword
+library.addKeyword({
+  keyword: 'isPositive',
+  type: 'number',
+  validate: (schema, data) => data >= 0
+}, { override: true })
+```
+
+##### `deregisterSchema(name)`
+Removes a schema from the registry.
+
+```javascript
+library.deregisterSchema('my-schema')
 ```
 
 ##### `addStringFormats(formats)`
@@ -257,7 +267,6 @@ The library includes these custom AJV keywords:
 | `isBytes` | Parses byte strings | `"1MB"` → `1048576` |
 | `isDate` | Parses date strings | `"2024-01-01"` → `Date` |
 | `isTimeMs` | Parses duration strings | `"7d"` → `604800000` |
-| `isDirectory` | Resolves path tokens | `"$ROOT/data"` → `"/app/data"` |
 | `isObjectId` | Marks ObjectId fields | No transformation |
 
 ## Error Handling
@@ -272,6 +281,7 @@ The library throws `SchemaError` with the following codes:
 | `INVALID_SCHEMA` | Schema fails JSON Schema validation |
 | `MISSING_SCHEMA` | Requested schema not found |
 | `VALIDATION_FAILED` | Data fails schema validation |
+| `KEYWORD_EXISTS` | Keyword already defined |
 | `MODIFY_PROTECTED_ATTR` | Attempt to modify internal/read-only field |
 
 ```javascript
