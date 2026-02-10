@@ -1,6 +1,6 @@
 {
   "name": "adapt-schemas",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Standalone JSON Schema library for the Adapt framework",
   "type": "module",
   "main": "index.js",
