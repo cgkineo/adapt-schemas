@@ -177,10 +177,7 @@ async function runTests () {
     // Test 1: Initialize library
     console.log('Test 1: Initialize library')
     const library = new Schemas({
-      enableCache: true,
-      directoryReplacements: {
-        $ROOT: process.cwd()
-      }
+      enableCache: true
     })
     await library.init()
     console.log('  ✓ Library initialized\n')
@@ -279,9 +276,10 @@ async function runTests () {
 
     console.log('=== All tests passed! ===')
   } finally {
-    if (hasSpecifiedPath) return
-    // Cleanup
-    await fs.rm(testSchemaDir, { recursive: true, force: true })
+    if (!hasSpecifiedPath) {
+      // Cleanup
+      await fs.rm(testSchemaDir, { recursive: true, force: true })
+    }
   }
 }
 
