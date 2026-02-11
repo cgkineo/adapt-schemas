@@ -8,6 +8,7 @@
     ".": "./index.js",
     "./Schemas": "./lib/Schemas.js",
     "./Schema": "./lib/Schema.js",
+    "./SchemaError": "./lib/SchemaError.js",
     "./Keywords": "./lib/Keywords.js",
     "./XSSDefaults": "./lib/XSSDefaults.js"
   },

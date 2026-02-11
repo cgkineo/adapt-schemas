@@ -1,7 +1,8 @@
-import Schemas, { SchemaError } from './lib/Schemas.js'
-import Schema from './lib/Schema.js'
 import Keywords from './lib/Keywords.js'
+import Schema from './lib/Schema.js'
+import SchemaError from './lib/SchemaError.js'
+import Schemas from './lib/Schemas.js'
 import XSSDefaults from './lib/XSSDefaults.js'
 
-export { Schemas, Schema, SchemaError, Keywords, XSSDefaults }
+export { Keywords, Schema, SchemaError, Schemas, XSSDefaults }
 export default Schemas
