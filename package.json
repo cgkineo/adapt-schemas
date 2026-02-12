@@ -1,5 +1,9 @@
 {
   "name": "adapt-schemas",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cgkineo/adapt-schemas"
+  },
   "version": "1.0.3",
   "description": "Standalone JSON Schema library for the Adapt framework",
   "type": "module",
