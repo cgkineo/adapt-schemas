@@ -274,6 +274,27 @@ async function runTests () {
     await library.registerSchema(newSchemaPath)
     console.log('')
 
+    // Test 11: Schema.walk
+    console.log('Test 11: Schema.walk')
+    const courseSchema = await library.getSchema('course')
+    const walkData = {
+      title: 'Test',
+      description: 'A course',
+      _globals: {
+        _accessibility: {
+          _isEnabled: true,
+          skipNavigationText: 'Skip'
+        }
+      }
+    }
+    const stringFields = courseSchema.walk(walkData, val => val.type === 'string')
+    const paths = stringFields.map(r => r.path)
+    console.log(`  ✓ Found ${stringFields.length} string fields: ${paths.join(', ')}`)
+    const hasTitle = paths.includes('title')
+    const hasNested = paths.includes('_globals/_accessibility/skipNavigationText')
+    console.log(`  ✓ Includes top-level field: ${hasTitle}`)
+    console.log(`  ✓ Includes nested field: ${hasNested}\n`)
+
     console.log('=== All tests passed! ===')
   } finally {
     if (!hasSpecifiedPath) {
