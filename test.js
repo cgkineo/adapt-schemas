@@ -119,6 +119,52 @@ async function setupTestSchemas () {
     }
   }
 
+  // Create a config schema with nested required+default fields (mimics trickle pattern)
+  const configSchema = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $anchor: 'config',
+    $merge: {
+      source: { $ref: 'base' },
+      with: {
+        properties: {
+          _trickle: {
+            type: 'object',
+            properties: {
+              _isEnabled: {
+                type: 'boolean',
+                default: true
+              },
+              _scrollDuration: {
+                type: 'number',
+                default: 500
+              },
+              _button: {
+                type: 'object',
+                properties: {
+                  _isEnabled: {
+                    type: 'boolean',
+                    default: true
+                  },
+                  _styleBeforeCompletion: {
+                    type: 'string',
+                    default: 'hidden'
+                  }
+                },
+                required: ['_styleBeforeCompletion']
+              },
+              _completionOrder: {
+                type: 'array',
+                items: { type: 'number' },
+                default: [1, 2, 3]
+              }
+            },
+            required: ['_scrollDuration']
+          }
+        }
+      }
+    }
+  }
+
   // Create a patch schema that extends course
   const coursePatchSchema = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -157,6 +203,10 @@ async function setupTestSchemas () {
   await fs.writeFile(
     path.join(testSchemaDir, 'component.schema.json'),
     JSON.stringify(componentSchema, null, 2)
+  )
+  await fs.writeFile(
+    path.join(testSchemaDir, 'config.schema.json'),
+    JSON.stringify(configSchema, null, 2)
   )
   await fs.writeFile(
     path.join(testSchemaDir, 'course-extension.schema.json'),
@@ -294,6 +344,43 @@ async function runTests () {
     const hasNested = paths.includes('_globals/_accessibility/skipNavigationText')
     console.log(`  ✓ Includes top-level field: ${hasTitle}`)
     console.log(`  ✓ Includes nested field: ${hasNested}\n`)
+
+    // Test 12: Deep defaults on partial nested objects
+    console.log('Test 12: Deep defaults on partial nested objects')
+    const configData = await library.validate('config', {
+      _trickle: { _isEnabled: false }
+    })
+    const hasScrollDuration = configData._trickle._scrollDuration === 500
+    const hasButtonDefaults = configData._trickle._button?._styleBeforeCompletion === 'hidden'
+    const preservedExplicit = configData._trickle._isEnabled === false
+    console.log(`  ✓ Nested default _scrollDuration applied: ${hasScrollDuration}`)
+    console.log(`  ✓ Deep nested _button defaults applied: ${hasButtonDefaults}`)
+    console.log(`  ✓ Explicitly set _isEnabled preserved: ${preservedExplicit}`)
+    if (!hasScrollDuration || !hasButtonDefaults || !preservedExplicit) {
+      throw new Error('Deep defaults not applied correctly to partial nested objects')
+    }
+    console.log('')
+
+    // Test 13: Array values are replaced, not merged (regression test for adapt-authoring-jsonschema#30)
+    console.log('Test 13: Array defaults are replaced, not merged')
+    const arrayData = await library.validate('config', {
+      _trickle: { _isEnabled: false, _completionOrder: [10, 20] }
+    })
+    const arrayNotMerged = JSON.stringify(arrayData._trickle._completionOrder) === '[10,20]'
+    console.log(`  ✓ Array preserved as [10,20], not merged with default: ${arrayNotMerged}`)
+    if (!arrayNotMerged) {
+      throw new Error(`Array was merged with defaults: got ${JSON.stringify(arrayData._trickle._completionOrder)}, expected [10,20]`)
+    }
+
+    const arrayDefaultApplied = await library.validate('config', {
+      _trickle: { _isEnabled: false }
+    })
+    const defaultArrayApplied = JSON.stringify(arrayDefaultApplied._trickle._completionOrder) === '[1,2,3]'
+    console.log(`  ✓ Missing array gets default [1,2,3]: ${defaultArrayApplied}`)
+    if (!defaultArrayApplied) {
+      throw new Error(`Default array not applied: got ${JSON.stringify(arrayDefaultApplied._trickle._completionOrder)}`)
+    }
+    console.log('')
 
     console.log('=== All tests passed! ===')
   } finally {
