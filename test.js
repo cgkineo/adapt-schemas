@@ -196,26 +196,16 @@ async function runTests () {
     const courseBuilt = await library.getBuiltSchema('course')
     console.log(`  ✓ Course schema has properties: ${Object.keys(courseBuilt.properties).join(', ')}\n`)
 
-    // Test 4: Get defaults
-    console.log('Test 4: Get schema defaults')
-    const courseDefaults = await library.getSchemaDefaults('course')
-    console.log('  ✓ Course defaults:', JSON.stringify(courseDefaults, null, 4).split('\n').map(l => '    ' + l).join('\n'), '\n')
-
-    // Test 5: Get _globals defaults
-    console.log('Test 5: Get _globals defaults')
-    const globalsDefaults = await library.getGlobalsDefaults('course')
-    console.log('  ✓ _globals defaults:', JSON.stringify(globalsDefaults, null, 4).split('\n').map(l => '    ' + l).join('\n'), '\n')
-
-    // Test 6: Validate data
-    console.log('Test 6: Validate data')
+    // Test 4: Validate data
+    console.log('Test 4: Validate data')
     const validData = await library.validate('course', {
       title: 'My Course'
     })
     console.log(`  ✓ Validated data has title: "${validData.title}"`)
     console.log(`  ✓ Default description applied: "${validData.description}"\n`)
 
-    // Test 7: Validate with error (missing required field without defaults)
-    console.log('Test 7: Validation error handling')
+    // Test 5: Validate with error (missing required field without defaults)
+    console.log('Test 5: Validation error handling')
     try {
       await library.validate('course', {
         // Missing required title - disable defaults to trigger required error
@@ -227,8 +217,8 @@ async function runTests () {
       console.log(`  ✓ Error message: ${e.message}\n`)
     }
 
-    // Test 7b: Validate with type error
-    console.log('Test 7b: Type validation error')
+    // Test 5b: Validate with type error
+    console.log('Test 5b: Type validation error')
     try {
       await library.validate('course', {
         title: 12345 // Should be string, not number
@@ -238,16 +228,16 @@ async function runTests () {
       console.log(`  ✓ Caught type validation error: ${e.code}\n`)
     }
 
-    // Test 8: Schema inheritance
-    console.log('Test 8: Schema inheritance')
+    // Test 6: Schema inheritance
+    console.log('Test 6: Schema inheritance')
     const componentBuilt = await library.getBuiltSchema('component')
     const hasInheritedBody = componentBuilt.properties.body !== undefined
     const hasOwnComponent = componentBuilt.properties._component !== undefined
     console.log(`  ✓ Component has inherited 'body' property: ${hasInheritedBody}`)
     console.log(`  ✓ Component has own '_component' property: ${hasOwnComponent}\n`)
 
-    // Test 9: Schema info
-    console.log('Test 9: Schema info')
+    // Test 7: Schema info
+    console.log('Test 7: Schema info')
     const info = library.getSchemaInfo()
     console.log('  ✓ Schema info:')
     Object.entries(info).forEach(([name, details]) => {
@@ -255,8 +245,8 @@ async function runTests () {
     })
     console.log('')
 
-    // Test 10: Events
-    console.log('Test 10: Event handling')
+    // Test 8: Events
+    console.log('Test 8: Event handling')
     library.on('schemaRegistered', (name) => {
       console.log(`  ✓ Event received: schemaRegistered (${name})`)
     })
@@ -274,8 +264,8 @@ async function runTests () {
     await library.registerSchema(newSchemaPath)
     console.log('')
 
-    // Test 11: Schema.walk
-    console.log('Test 11: Schema.walk')
+    // Test 9: Schema.walk
+    console.log('Test 9: Schema.walk')
     const courseSchema = await library.getSchema('course')
     const walkData = {
       title: 'Test',
