@@ -400,7 +400,7 @@ async function runTests () {
         _trickle: { _isEnabled: false }
       })
       const hasRequired = issueData._trickle._scrollDuration === 500
-      console.log(`  ✓ Validation passed (did not throw): true`)
+      console.log('  ✓ Validation passed (did not throw): true')
       console.log(`  ✓ Required+default _scrollDuration applied: ${hasRequired}`)
       if (!hasRequired) {
         throw new Error('Required+default field _scrollDuration was not applied')
