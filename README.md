@@ -1,6 +1,6 @@
 # adapt-schemas
 
-A standalone JSON Schema library for the Adapt framework stack. Load schemas from plugin folders via glob patterns, validate JSON data, and extract defaults including `_globals` from course schemas.
+A standalone JSON Schema library for the Adapt framework stack. Load schemas from plugin folders via glob patterns and validate JSON data with automatic defaults application via AJV.
 
 ## Installation
 
@@ -23,13 +23,10 @@ await library.loadSchemas('**/schema/*.schema.json', {
   ignore: ['**/node_modules/**']
 })
 
-// Validate data against a schema
+// Validate data against a schema (defaults are applied automatically)
 const validatedData = await library.validate('course', {
   title: 'My Course'
 })
-
-// Get _globals defaults from the course schema
-const globals = await library.getGlobalsDefaults('course')
 ```
 
 ## API Reference
@@ -108,22 +105,6 @@ const validated = await library.validate('course', inputData, {
   useDefaults: true,     // Apply schema defaults (default: true)
   ignoreRequired: false  // Ignore required field errors
 })
-```
-
-##### `getSchemaDefaults(schemaName)`
-Returns all defaults as a structured object.
-
-```javascript
-const defaults = await library.getSchemaDefaults('course')
-// { title: 'Untitled', _globals: { ... } }
-```
-
-##### `getGlobalsDefaults(schemaName)`
-Extracts `_globals` defaults from a schema.
-
-```javascript
-const globals = await library.getGlobalsDefaults('course')
-// { _accessibility: { _isEnabled: true, ... }, _extensions: { ... } }
 ```
 
 ##### `getSchemaNames()`
