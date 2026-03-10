@@ -15,16 +15,16 @@ import Schemas from 'adapt-schemas'
 
 // Create and initialize the library
 const library = new Schemas()
-await library.init()
+library.init()
 
 // Load schemas from plugin directories
-await library.loadSchemas('**/schema/*.schema.json', {
+library.loadSchemas('**/schema/*.schema.json', {
   cwd: './plugins',
   ignore: ['**/node_modules/**']
 })
 
 // Validate data against a schema (defaults are applied automatically)
-const validatedData = await library.validate('course', {
+const validatedData = library.validate('course', {
   title: 'My Course'
 })
 ```
@@ -50,20 +50,20 @@ const library = new Schemas({
 Initializes the library and loads the base schema.
 
 ```javascript
-await library.init()
+library.init()
 ```
 
 ##### `loadSchemas(patterns, options)`
 Loads schemas from directories matching glob patterns.
 
 ```javascript
-await library.loadSchemas('**/schema/*.schema.json', {
+library.loadSchemas('**/schema/*.schema.json', {
   cwd: './plugins',           // Base directory for patterns
   ignore: ['**/excluded/**']  // Patterns to exclude
 })
 
 // Multiple patterns
-await library.loadSchemas([
+library.loadSchemas([
   'core/**/schema/*.schema.json',
   'plugins/**/schema/*.schema.json'
 ], { ignore: ['**/node_modules/**'] })
@@ -73,7 +73,7 @@ await library.loadSchemas([
 Registers a single schema file.
 
 ```javascript
-await library.registerSchema('/path/to/schema.json', {
+library.registerSchema('/path/to/schema.json', {
   replace: false  // Replace existing schema with same name
 })
 ```
@@ -82,7 +82,7 @@ await library.registerSchema('/path/to/schema.json', {
 Retrieves and builds a schema by name.
 
 ```javascript
-const schema = await library.getSchema('course', {
+const schema = library.getSchema('course', {
   useCache: true,        // Use cached build if available
   compile: true,         // Compile the schema
   applyExtensions: true  // Apply $patch extensions
@@ -93,7 +93,7 @@ const schema = await library.getSchema('course', {
 Returns the built schema object.
 
 ```javascript
-const schemaObj = await library.getBuiltSchema('course')
+const schemaObj = library.getBuiltSchema('course')
 console.log(schemaObj.properties)
 ```
 
@@ -101,7 +101,7 @@ console.log(schemaObj.properties)
 Validates data against a named schema.
 
 ```javascript
-const validated = await library.validate('course', inputData, {
+const validated = library.validate('course', inputData, {
   useDefaults: true,     // Apply schema defaults (default: true)
   ignoreRequired: false  // Ignore required field errors
 })
@@ -269,7 +269,7 @@ The library throws `SchemaError` with the following codes:
 import { SchemaError } from 'adapt-schemas'
 
 try {
-  await library.validate('course', data)
+  library.validate('course', data)
 } catch (e) {
   if (e instanceof SchemaError) {
     console.log(e.code)    // 'VALIDATION_FAILED'
