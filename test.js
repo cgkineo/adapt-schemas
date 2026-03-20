@@ -165,6 +165,63 @@ async function setupTestSchemas () {
     }
   }
 
+  // Create a config extension that mimics adapt-contrib-languagePicker
+  const languagePickerConfigSchema = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $anchor: 'languagePicker-config',
+    $patch: {
+      source: { $ref: 'config' },
+      with: {
+        properties: {
+          _languagePicker: {
+            type: 'object',
+            default: {},
+            properties: {
+              _isEnabled: { type: 'boolean', default: false },
+              _showOnCourseLoad: { type: 'boolean', default: true },
+              _languagePickerIconClass: { type: 'string', default: 'icon-language-2' },
+              _restoreStateOnLanguageChange: { type: 'boolean', default: false },
+              _classes: { type: 'string', default: '' },
+              _display: {
+                type: 'object',
+                // deliberately no default: {} — tests Case 3
+                properties: {
+                  _iconClass: { type: 'string', default: 'icon-default' },
+                  _position: { type: 'string', default: 'left' }
+                }
+              },
+              _languages: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    _language: { type: 'string', default: '' },
+                    _direction: { type: 'string', default: 'ltr' },
+                    _isDisabled: { type: 'boolean', default: false },
+                    displayName: { type: 'string', default: '' },
+                    _buttons: {
+                      type: 'object',
+                      default: {},
+                      properties: {
+                        yes: { type: 'string', default: 'Yes' },
+                        no: { type: 'string', default: 'No' }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  await fs.writeFile(
+    path.join(testSchemaDir, 'languagePicker-config.schema.json'),
+    JSON.stringify(languagePickerConfigSchema, null, 2)
+  )
+
   // Create a patch schema that extends course
   const coursePatchSchema = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -410,6 +467,110 @@ async function runTests () {
         throw new Error(`Issue #21 regression: validation failed on partial nested object: ${e.data?.errors || e.message}`)
       }
       throw e
+    }
+    console.log('')
+
+    // Test 14: ignoreErrors applies defaults without throwing on invalid data
+    console.log('Test 14: ignoreErrors applies defaults without throwing')
+    const invalidData = await library.validate('course', {
+      title: 12345 // wrong type — would normally throw
+    }, { ignoreErrors: true })
+    const defaultApplied = invalidData.description === ''
+    const invalidPreserved = invalidData.title === 12345
+    console.log(`  ✓ Default description applied despite type error: ${defaultApplied}`)
+    console.log(`  ✓ Invalid title value preserved: ${invalidPreserved}`)
+    if (!defaultApplied || !invalidPreserved) {
+      throw new Error('ignoreErrors did not apply defaults or preserve existing data')
+    }
+
+    // Verify it would throw without ignoreErrors
+    try {
+      await library.validate('course', { title: 12345 })
+      throw new Error('Should have thrown without ignoreErrors')
+    } catch (e) {
+      if (e.code !== 'VALIDATION_FAILED') throw e
+      console.log('  ✓ Same data throws without ignoreErrors: true')
+    }
+    console.log('')
+
+    // Test 15: ignoreErrors with missing required fields
+    console.log('Test 15: ignoreErrors ignores required field errors')
+    const missingRequired = await library.validate('course', {
+      description: 'No title provided'
+    }, { useDefaults: false, ignoreErrors: true })
+    const descPreserved = missingRequired.description === 'No title provided'
+    console.log(`  ✓ Data returned despite missing required "title": ${descPreserved}`)
+    if (!descPreserved) {
+      throw new Error('ignoreErrors did not return data with missing required fields')
+    }
+    console.log('')
+
+    // Test 16: Issue #30 Case 1 — Partially populated object missing sibling defaults
+    console.log('Test 16: Issue #30 Case 1 — Partially populated plugin config')
+    const partialConfig = await library.validate('config', {
+      _languagePicker: {
+        _isEnabled: true,
+        _languages: [
+          {
+            _language: 'en',
+            _direction: 'ltr',
+            displayName: 'English'
+          }
+        ]
+      }
+    }, { ignoreErrors: true })
+    const lp = partialConfig._languagePicker
+    const case1Checks = [
+      ['_isEnabled preserved', lp._isEnabled === true],
+      ['_showOnCourseLoad defaulted to true', lp._showOnCourseLoad === true],
+      ['_languagePickerIconClass defaulted', lp._languagePickerIconClass === 'icon-language-2'],
+      ['_restoreStateOnLanguageChange defaulted', lp._restoreStateOnLanguageChange === false],
+      ['_classes defaulted to empty string', lp._classes === ''],
+      ['_languages[0]._isDisabled defaulted', lp._languages[0]._isDisabled === false],
+      ['_languages[0]._buttons defaulted', lp._languages[0]._buttons?.yes === 'Yes'],
+      ['_languages[0]._buttons.no defaulted', lp._languages[0]._buttons?.no === 'No']
+    ]
+    case1Checks.forEach(([desc, ok]) => console.log(`  ${ok ? '✓' : '✗'} ${desc}: ${ok}`))
+    const case1Failed = case1Checks.filter(([, ok]) => !ok)
+    if (case1Failed.length) {
+      throw new Error(`Case 1 failures: ${case1Failed.map(([d]) => d).join(', ')}`)
+    }
+    console.log('')
+
+    // Test 17: Issue #30 Case 2 — Plugin object entirely absent
+    console.log('Test 17: Issue #30 Case 2 — Plugin object entirely absent')
+    const emptyConfig = await library.validate('config', {}, { ignoreErrors: true })
+    const lp2 = emptyConfig._languagePicker
+    const case2Checks = [
+      ['_languagePicker created from default: {}', lp2 !== undefined],
+      ['_isEnabled defaulted to false', lp2?._isEnabled === false],
+      ['_showOnCourseLoad defaulted to true', lp2?._showOnCourseLoad === true],
+      ['_languagePickerIconClass defaulted', lp2?._languagePickerIconClass === 'icon-language-2']
+    ]
+    case2Checks.forEach(([desc, ok]) => console.log(`  ${ok ? '✓' : '✗'} ${desc}: ${ok}`))
+    const case2Failed = case2Checks.filter(([, ok]) => !ok)
+    if (case2Failed.length) {
+      throw new Error(`Case 2 failures: ${case2Failed.map(([d]) => d).join(', ')}`)
+    }
+    console.log('')
+
+    // Test 18: Issue #30 Case 3 — Nested object without default: {}
+    console.log('Test 18: Issue #30 Case 3 — Nested object without default: {}')
+    const noNestedDefault = await library.validate('config', {
+      _languagePicker: { _isEnabled: true }
+    }, { ignoreErrors: true })
+    const lp3 = noNestedDefault._languagePicker
+    // _display has no default: {} so it should NOT be created by AJV
+    const displayMissing = lp3._display === undefined
+    console.log(`  ✓ _display not created (no default: {}): ${displayMissing}`)
+    if (!displayMissing) {
+      console.log(`    Note: _display was unexpectedly created: ${JSON.stringify(lp3._display)}`)
+    }
+    // But sibling defaults should still apply
+    const siblingsApplied = lp3._showOnCourseLoad === true && lp3._languagePickerIconClass === 'icon-language-2'
+    console.log(`  ✓ Sibling defaults still applied: ${siblingsApplied}`)
+    if (!siblingsApplied) {
+      throw new Error('Sibling defaults not applied when nested object has no default')
     }
     console.log('')
 
