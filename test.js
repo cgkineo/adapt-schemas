@@ -1,7 +1,7 @@
 /**
  * Test script for the Adapt Schema Library
  */
-import Schemas from './index.js'
+import Schemas, { XSSDefaults } from './index.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs/promises'
@@ -220,6 +220,35 @@ async function setupTestSchemas () {
   await fs.writeFile(
     path.join(testSchemaDir, 'languagePicker-config.schema.json'),
     JSON.stringify(languagePickerConfigSchema, null, 2)
+  )
+
+  // Schema used for XSS sanitization tests — string fields at top level
+  // and nested inside an object so sanitise() recursion is exercised.
+  const xssTestSchema = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $anchor: 'xss-test',
+    $merge: {
+      source: { $ref: 'base' },
+      with: {
+        properties: {
+          body: { type: 'string', default: '' },
+          title: { type: 'string', default: '' },
+          count: { type: 'number', default: 0 },
+          meta: {
+            type: 'object',
+            properties: {
+              description: { type: 'string', default: '' },
+              author: { type: 'string', default: '' }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  await fs.writeFile(
+    path.join(testSchemaDir, 'xss-test.schema.json'),
+    JSON.stringify(xssTestSchema, null, 2)
   )
 
   // Create a patch schema that extends course
@@ -571,6 +600,254 @@ async function runTests () {
     console.log(`  ✓ Sibling defaults still applied: ${siblingsApplied}`)
     if (!siblingsApplied) {
       throw new Error('Sibling defaults not applied when nested object has no default')
+    }
+    console.log('')
+
+    // Test 19: XSS sanitization — dangerous content is stripped or escaped
+    console.log('Test 19: XSS sanitization — dangerous payloads')
+    const xssSchema = await library.getSchema('xss-test')
+    const sanitiseBody = input => xssSchema.sanitise({ body: input }, { sanitiseHtml: true, strict: false }).body
+
+    const dangerousCases = [
+      {
+        desc: '<script> tag escaped',
+        input: '<script>alert(1)</script>',
+        check: out => !/<script/i.test(out) && !out.includes('alert(1)</script>')
+      },
+      {
+        desc: 'onerror handler stripped from <img>',
+        input: '<img src=x onerror="alert(1)">',
+        check: out => !/onerror/i.test(out)
+      },
+      {
+        desc: 'onclick handler stripped from allowed <a>',
+        input: '<a href="https://example.com" onclick="evil()">link</a>',
+        check: out => !/onclick/i.test(out) && out.includes('example.com')
+      },
+      {
+        desc: 'javascript: URL stripped from <a href>',
+        input: '<a href="javascript:alert(1)">click</a>',
+        check: out => !/javascript:/i.test(out)
+      },
+      {
+        desc: '<iframe> (not whitelisted) escaped',
+        input: '<iframe src="https://evil.com"></iframe>',
+        check: out => !/<iframe/i.test(out)
+      },
+      {
+        desc: '<svg onload> (not whitelisted) escaped',
+        input: '<svg onload="alert(1)"></svg>',
+        check: out => !/<svg/i.test(out)
+      },
+      {
+        desc: '<object> (not whitelisted) escaped',
+        input: '<object data="evil.swf"></object>',
+        check: out => !/<object/i.test(out)
+      },
+      {
+        desc: 'style attribute (not whitelisted) stripped from <div>',
+        input: '<div style="background:url(javascript:alert(1))">x</div>',
+        check: out => !/style=/i.test(out) && !/javascript:/i.test(out)
+      },
+      {
+        desc: 'data: URI in href stripped',
+        input: '<a href="data:text/html,<script>alert(1)</script>">x</a>',
+        check: out => !/data:text\/html/i.test(out) && !/<script/i.test(out)
+      }
+    ]
+
+    const dangerousResults = dangerousCases.map(({ desc, input, check }) => {
+      const out = sanitiseBody(input)
+      const ok = check(out)
+      return { desc, input, out, ok }
+    })
+    dangerousResults.forEach(({ desc, input, out, ok }) => {
+      console.log(`  ${ok ? '✓' : '✗'} ${desc}`)
+      if (!ok) console.log(`    input:  ${JSON.stringify(input)}\n    output: ${JSON.stringify(out)}`)
+    })
+    const dangerousFailed = dangerousResults.filter(r => !r.ok)
+    if (dangerousFailed.length) {
+      throw new Error(`Dangerous-payload failures: ${dangerousFailed.map(r => r.desc).join(', ')}`)
+    }
+    console.log('')
+
+    // Test 20: XSS sanitization — safe content passes through
+    console.log('Test 20: XSS sanitization — safe content preserved')
+    const safeCases = [
+      { desc: 'plain text unchanged', input: 'Hello, world.', check: out => out === 'Hello, world.' },
+      { desc: 'empty string unchanged', input: '', check: out => out === '' },
+      { desc: '<b> preserved', input: '<b>bold</b>', check: out => /<b>bold<\/b>/.test(out) },
+      { desc: '<strong> preserved', input: '<strong>x</strong>', check: out => /<strong>x<\/strong>/.test(out) },
+      { desc: '<em> preserved', input: '<em>x</em>', check: out => /<em>x<\/em>/.test(out) },
+      {
+        desc: '<a href=https://> preserved with href',
+        input: '<a href="https://example.com">link</a>',
+        check: out => /<a[^>]+href="https:\/\/example\.com"[^>]*>link<\/a>/.test(out)
+      },
+      {
+        desc: '<a href=http://> (http) preserved',
+        input: '<a href="http://example.com">link</a>',
+        check: out => /href="http:\/\/example\.com"/.test(out)
+      },
+      {
+        desc: 'nested allowed tags preserved',
+        input: '<p><strong>bold</strong> and <em>italic</em></p>',
+        check: out => /<strong>bold<\/strong>/.test(out) && /<em>italic<\/em>/.test(out)
+      },
+      {
+        desc: 'text with ampersand entities preserved',
+        input: 'Fish &amp; chips',
+        check: out => out.includes('&amp;') || out.includes('&')
+      }
+    ]
+
+    const safeResults = safeCases.map(({ desc, input, check }) => {
+      const out = sanitiseBody(input)
+      return { desc, input, out, ok: check(out) }
+    })
+    safeResults.forEach(({ desc, input, out, ok }) => {
+      console.log(`  ${ok ? '✓' : '✗'} ${desc}`)
+      if (!ok) console.log(`    input:  ${JSON.stringify(input)}\n    output: ${JSON.stringify(out)}`)
+    })
+    const safeFailed = safeResults.filter(r => !r.ok)
+    if (safeFailed.length) {
+      throw new Error(`Safe-content failures: ${safeFailed.map(r => r.desc).join(', ')}`)
+    }
+    console.log('')
+
+    // Test 21: XSS sanitization — nested objects and non-string fields
+    console.log('Test 21: XSS sanitization — recursion + type handling')
+    const nestedInput = {
+      body: '<script>alert("top")</script><b>safe</b>',
+      title: '<img src=x onerror=alert(1)>',
+      count: 42,
+      meta: {
+        description: '<iframe src="evil"></iframe>clean',
+        author: '<a href="javascript:bad()">me</a>'
+      }
+    }
+    const nestedOut = xssSchema.sanitise(nestedInput, { sanitiseHtml: true, strict: false })
+    const nestedChecks = [
+      ['top-level string sanitized (script removed)', !/<script/i.test(nestedOut.body)],
+      ['top-level string sanitized (b preserved)', /<b>safe<\/b>/.test(nestedOut.body)],
+      ['top-level string sanitized (onerror removed)', !/onerror/i.test(nestedOut.title)],
+      ['number field passed through untouched', nestedOut.count === 42],
+      ['nested string sanitized (iframe escaped)', !/<iframe/i.test(nestedOut.meta.description)],
+      ['nested string sanitized (javascript: stripped)', !/javascript:/i.test(nestedOut.meta.author)]
+    ]
+    nestedChecks.forEach(([desc, ok]) => console.log(`  ${ok ? '✓' : '✗'} ${desc}: ${ok}`))
+    const nestedFailed = nestedChecks.filter(([, ok]) => !ok)
+    if (nestedFailed.length) {
+      throw new Error(`Nested sanitization failures: ${nestedFailed.map(([d]) => d).join(', ')}`)
+    }
+    console.log('')
+
+    // Test 22: xssWhitelistOverride replaces defaults at construction
+    console.log('Test 22: xssWhitelistOverride replaces defaults at construction')
+    const restrictiveLibrary = new Schemas({
+      enableCache: false,
+      xssWhitelistOverride: true,
+      xssWhitelist: { strong: [] } // only <strong> allowed, no attributes
+    })
+    restrictiveLibrary.init()
+    await restrictiveLibrary.loadSchemas('xss-test.schema.json', { cwd: testSchemaDir })
+    const restrictiveSchema = await restrictiveLibrary.getSchema('xss-test')
+    const restrictiveSanitise = input =>
+      restrictiveSchema.sanitise({ body: input }, { sanitiseHtml: true, strict: false }).body
+
+    const overrideChecks = [
+      ['<strong> (in custom list) preserved', /<strong>x<\/strong>/.test(restrictiveSanitise('<strong>x</strong>'))],
+      ['<b> (in defaults, not custom) escaped', !/<b>x<\/b>/.test(restrictiveSanitise('<b>x</b>'))],
+      ['<a> (in defaults, not custom) escaped', !/<a /i.test(restrictiveSanitise('<a href="https://example.com">x</a>'))],
+      ['<script> still escaped', !/<script/i.test(restrictiveSanitise('<script>alert(1)</script>'))]
+    ]
+    overrideChecks.forEach(([desc, ok]) => console.log(`  ${ok ? '✓' : '✗'} ${desc}: ${ok}`))
+    const overrideFailed = overrideChecks.filter(([, ok]) => !ok)
+    if (overrideFailed.length) {
+      throw new Error(`xssWhitelistOverride failures: ${overrideFailed.map(([d]) => d).join(', ')}`)
+    }
+    console.log('')
+
+    // Test 23: Exhaustive round-trip of XSSDefaults — every allowed tag and
+    // every allowed attribute on that tag survives; a disallowed attribute
+    // (onclick, not in any default list) is stripped from every tag.
+    console.log('Test 23: Exhaustive XSSDefaults coverage')
+    const voidTags = new Set(['area', 'br', 'col', 'hr', 'img', 'wbr'])
+    const urlAttrs = new Set(['href', 'src', 'cite', 'poster'])
+    const numericAttrs = new Set([
+      'colspan', 'coords', 'height', 'rowspan', 'size', 'span', 'tabindex', 'width'
+    ])
+    const booleanAttrs = new Set([
+      'autoplay', 'controls', 'loop', 'muted', 'open', 'playsinline', 'preload'
+    ])
+
+    const safeAttrValue = attr => {
+      if (urlAttrs.has(attr)) return 'https://example.com/x'
+      if (numericAttrs.has(attr)) return '1'
+      if (booleanAttrs.has(attr)) return attr
+      if (attr === 'datetime') return '2024-01-01T00:00:00Z'
+      if (attr === 'dir') return 'ltr'
+      if (attr === 'align' || attr === 'valign') return 'left'
+      if (attr === 'shape') return 'rect'
+      if (attr === 'lang') return 'en'
+      if (attr === 'role') return 'button'
+      if (attr === 'color') return 'red'
+      return 'test'
+    }
+
+    const openTag = (tag, attrs) => {
+      const attrStr = attrs ? ` ${attrs}` : ''
+      return voidTags.has(tag) ? `<${tag}${attrStr}>` : `<${tag}${attrStr}>x</${tag}>`
+    }
+
+    const exhaustiveLibrary = new Schemas({ enableCache: false })
+    exhaustiveLibrary.init()
+    await exhaustiveLibrary.loadSchemas('xss-test.schema.json', { cwd: testSchemaDir })
+    const exhaustiveSchema = await exhaustiveLibrary.getSchema('xss-test')
+    const san = input => exhaustiveSchema.sanitise({ body: input }, { sanitiseHtml: true, strict: false }).body
+
+    const tagFailures = []
+    const attrFailures = []
+    const disallowedFailures = []
+    let tagCount = 0
+    let attrCount = 0
+
+    Object.entries(XSSDefaults).forEach(([tag, attrs]) => {
+      tagCount++
+
+      const tagOut = san(openTag(tag))
+      if (!tagOut.includes(`<${tag}`)) {
+        tagFailures.push({ tag, output: tagOut })
+      }
+
+      const badInput = openTag(tag, 'onclick="evil()"')
+      const badOut = san(badInput)
+      if (/onclick/i.test(badOut)) {
+        disallowedFailures.push({ tag, output: badOut })
+      }
+
+      attrs.forEach(attr => {
+        attrCount++
+        const val = safeAttrValue(attr)
+        const out = san(openTag(tag, `${attr}="${val}"`))
+        if (!out.toLowerCase().includes(`${attr.toLowerCase()}=`)) {
+          attrFailures.push({ tag, attr, val, output: out })
+        }
+      })
+    })
+
+    console.log(`  ${tagFailures.length === 0 ? '✓' : '✗'} ${tagCount} tags preserved (${tagFailures.length} failures)`)
+    tagFailures.forEach(({ tag, output }) => console.log(`    - <${tag}> → ${JSON.stringify(output)}`))
+    console.log(`  ${attrFailures.length === 0 ? '✓' : '✗'} ${attrCount} (tag, attr) pairs preserved (${attrFailures.length} failures)`)
+    attrFailures.forEach(({ tag, attr, val, output }) =>
+      console.log(`    - <${tag} ${attr}="${val}"> → ${JSON.stringify(output)}`)
+    )
+    console.log(`  ${disallowedFailures.length === 0 ? '✓' : '✗'} ${tagCount} onclick-strip checks (${disallowedFailures.length} failures)`)
+    disallowedFailures.forEach(({ tag, output }) => console.log(`    - <${tag} onclick> → ${JSON.stringify(output)}`))
+
+    const totalExhaustiveFailures = tagFailures.length + attrFailures.length + disallowedFailures.length
+    if (totalExhaustiveFailures > 0) {
+      throw new Error(`XSSDefaults exhaustive check: ${totalExhaustiveFailures} total failures`)
     }
     console.log('')
 
