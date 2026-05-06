@@ -851,6 +851,41 @@ async function runTests () {
     }
     console.log('')
 
+    // Test 24: deregisterSchema cleans up extension references (issue #37)
+    console.log('Test 24: deregisterSchema cleans up extension references (issue #37)')
+    const extPatchPath = path.join(testSchemaDir, 'patch-ext.schema.json')
+    await fs.writeFile(extPatchPath, JSON.stringify({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      $anchor: 'patch-ext',
+      type: 'object',
+      $patch: { source: { $ref: 'config' }, with: { properties: { _patchAdded: { type: 'string', default: 'added' } } } }
+    }, null, 2))
+    library.registerSchema(extPatchPath)
+    const beforeDeregister = library.schemaExtensions.config?.includes('patch-ext')
+    console.log(`  ✓ Extension registered against base: ${beforeDeregister}`)
+    const builtWithExt = (await library.getSchema('config')).built
+    const hasPatchedProperty = '_patchAdded' in (builtWithExt.properties ?? {})
+    console.log(`  ✓ Patched property visible in cached build: ${hasPatchedProperty}`)
+    library.deregisterSchema('patch-ext')
+    const afterDeregister = !library.schemaExtensions.config?.includes('patch-ext')
+    console.log(`  ✓ Extension removed from base after deregister: ${afterDeregister}`)
+    const cacheInvalidated = library.schemas.config?.built === undefined
+    console.log(`  ✓ Base cached build invalidated on deregister: ${cacheInvalidated}`)
+    let buildSucceeded = true
+    let postRebuildHasPatch = true
+    try {
+      const rebuilt = (await library.getSchema('config')).built
+      postRebuildHasPatch = '_patchAdded' in (rebuilt.properties ?? {})
+    } catch (e) {
+      buildSucceeded = false
+    }
+    console.log(`  ✓ Cached rebuild of base after deregister succeeds: ${buildSucceeded}`)
+    console.log(`  ✓ Patched property gone from rebuilt schema: ${!postRebuildHasPatch}`)
+    if (!beforeDeregister || !hasPatchedProperty || !afterDeregister || !cacheInvalidated || !buildSucceeded || postRebuildHasPatch) {
+      throw new Error('deregisterSchema did not clean up extension references and cached builds correctly')
+    }
+    console.log('')
+
     console.log('=== All tests passed! ===')
   } finally {
     if (!hasSpecifiedPath) {
