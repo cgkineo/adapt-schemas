@@ -886,6 +886,28 @@ async function runTests () {
     }
     console.log('')
 
+    // Test 25: useCache:false isolates filtered builds from the registry instance
+    console.log('Test 25: useCache:false isolates filtered builds from the registry instance')
+    const includeLP = s => s === 'languagePicker-config'
+    const excludeLP = () => false
+    const registrySchema = library.schemas.config
+    const withLPSchema = await library.getSchema('config', { useCache: false, extensionFilter: includeLP })
+    const withoutLPSchema = await library.getSchema('config', { useCache: false, extensionFilter: excludeLP })
+    const withLPHas = '_languagePicker' in (withLPSchema.built.properties ?? {})
+    const withoutLPHas = '_languagePicker' in (withoutLPSchema.built.properties ?? {})
+    console.log(`  ✓ Filter-include build has _languagePicker: ${withLPHas}`)
+    console.log(`  ✓ Filter-exclude build lacks _languagePicker: ${!withoutLPHas}`)
+    // earlier build's properties must not be mutated by the later build (the original race)
+    const withLPStillHas = '_languagePicker' in (withLPSchema.built.properties ?? {})
+    console.log(`  ✓ Earlier filter-include build is unaffected by later call: ${withLPStillHas}`)
+    // each filtered call must return a fresh instance, not the registry one
+    const isolatedFromRegistry = withLPSchema !== registrySchema && withoutLPSchema !== registrySchema && withLPSchema !== withoutLPSchema
+    console.log(`  ✓ Filtered builds return isolated Schema instances: ${isolatedFromRegistry}`)
+    if (!withLPHas || withoutLPHas || !withLPStillHas || !isolatedFromRegistry) {
+      throw new Error('useCache:false did not isolate filtered builds from the registry')
+    }
+    console.log('')
+
     console.log('=== All tests passed! ===')
   } finally {
     if (!hasSpecifiedPath) {
