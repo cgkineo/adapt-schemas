@@ -164,6 +164,33 @@ library.addStringFormats({
 })
 ```
 
+### Schema Instance
+
+Objects returned by `getSchema()` expose additional methods:
+
+#### Methods
+
+##### `sanitise(data, options)`
+Strips internal/read-only fields and XSS-sanitises string values according to the schema.
+
+```javascript
+const schema = library.getSchema('course')
+const clean = schema.sanitise(data, {
+  isInternal: false,   // Filter internal fields (default: false)
+  isReadOnly: false,   // Filter read-only fields (default: false)
+  sanitiseHtml: true,  // Strip XSS from string values (default: true)
+  strict: true         // Throw MODIFY_PROTECTED_ATTR instead of dropping silently (default: true)
+})
+```
+
+##### `walk(data, predicate)`
+Walks data alongside the schema, returning fields matching a predicate.
+
+```javascript
+const stringFields = schema.walk(data, field => field.type === 'string')
+// [{ path, key, data, value, schemaField }, ...]
+```
+
 ### Events
 
 The library extends EventEmitter and emits the following events:
