@@ -1,0 +1,33 @@
+# Line endings: LF in the repository AND in the working tree.
+#
+# The repos are configured with core.autocrlf=input, which normalises only on
+# commit and leaves the working tree as whatever tool wrote it. That is how
+# source files here ended up with *mixed* endings - e.g. global/routes.ts had
+# 351 CRLF lines and LF lines in the same file - which silently breaks
+# exact-text patching and makes diffs noisy. Declaring it here makes the rule
+# travel with the repo instead of depending on each clone's local config.
+#
+# NOTE: this governs git only; it does not rewrite files already on disk.
+# Run `git add --renormalize .` once at a natural commit point to fix those.
+* text=auto eol=lf
+
+# Binary assets - never touch these
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.zip  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary
+*.otf  binary
+*.mp3  binary
+*.mp4  binary
+*.bson binary
+
+# Generated lockfiles: keep diffs collapsed in review
+package-lock.json -diff
