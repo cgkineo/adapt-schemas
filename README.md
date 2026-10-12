@@ -172,6 +172,8 @@ Objects returned by `getSchema()` expose additional methods:
 
 ##### `sanitise(data, options)`
 Strips internal/read-only fields and XSS-sanitises string values according to the schema.
+Strings edited as Less or CSS code (`CodeEditor` with mode `less` or `css`, in `_backboneForms` or
+`_adapt`) are left as written: they compile to a stylesheet, and escaping `>` would break the Less.
 
 ```javascript
 const schema = library.getSchema('course')
