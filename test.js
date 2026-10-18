@@ -908,6 +908,50 @@ async function runTests () {
     }
     console.log('')
 
+    console.log('Test 26: Rebuilds and uncached builds reuse compiled validators')
+    const compiledCount = () => library.compiledSchemas.size
+    const first = (await library.getSchema('config', { useCache: false })).compiled
+    const before = compiledCount()
+    let reused = true
+    for (let i = 0; i < 20; i++) {
+      reused = reused && (await library.getSchema('config', { useCache: false })).compiled === first
+      library.schemas.config.lastBuildTime = undefined // invalidated, as when an extension is added or removed
+      reused = reused && (await library.getSchema('config')).compiled === first
+    }
+    const after = compiledCount()
+    console.log(`  ✓ Compiled schemas before ${before}, after 20 rounds ${after}`)
+    console.log(`  ✓ Same schema content reuses the same compiled function: ${reused}`)
+    const reordered = library.compileBuilt(Object.fromEntries(Object.entries(library.schemas.config.built).reverse())).compiled === first
+    console.log(`  ✓ The same schema with its keys in another order reuses it too: ${reordered}`)
+    const stillValidates = library.validate('course', { title: 'T' }).title === 'T'
+    console.log(`  ✓ Compiled schemas still validate: ${stillValidates}`)
+    if (after > before || !reused || !reordered || !stillValidates) {
+      throw new Error('identical schema builds are compiled again')
+    }
+    console.log('')
+
+    console.log('Test 27: Resetting and re-registering schemas compiles nothing')
+    const compileCalls = { count: 0 }
+    for (const v of [library.validator, library.validatorWithDefaults]) {
+      const original = v._compileSchemaEnv.bind(v)
+      v._compileSchemaEnv = env => { compileCalls.count++; return original(env) }
+    }
+    // a simple schema (no $merge/$patch) is the kind added to Ajv's own store
+    const simplePath = path.join(__dirname, 'simple-test.schema.json')
+    await fs.writeFile(simplePath, JSON.stringify({ $anchor: 'simple-test', type: 'object', properties: { a: { type: 'string' } } }))
+    try {
+      library.registerSchema(simplePath, { replace: true })
+      library.registerSchema(simplePath, { replace: true })
+      library.resetSchemaRegistry()
+    } finally {
+      await fs.rm(simplePath, { force: true })
+    }
+    console.log(`  ✓ Schemas compiled while resetting and re-registering: ${compileCalls.count}`)
+    if (compileCalls.count > 0) {
+      throw new Error('resetting or registering schemas compiles them')
+    }
+    console.log('')
+
     console.log('=== All tests passed! ===')
   } finally {
     if (!hasSpecifiedPath) {
