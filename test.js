@@ -930,6 +930,28 @@ async function runTests () {
     }
     console.log('')
 
+    console.log('Test 27: Resetting and re-registering schemas compiles nothing')
+    const compileCalls = { count: 0 }
+    for (const v of [library.validator, library.validatorWithDefaults]) {
+      const original = v._compileSchemaEnv.bind(v)
+      v._compileSchemaEnv = env => { compileCalls.count++; return original(env) }
+    }
+    // a simple schema (no $merge/$patch) is the kind added to Ajv's own store
+    const simplePath = path.join(__dirname, 'simple-test.schema.json')
+    await fs.writeFile(simplePath, JSON.stringify({ $anchor: 'simple-test', type: 'object', properties: { a: { type: 'string' } } }))
+    try {
+      library.registerSchema(simplePath, { replace: true })
+      library.registerSchema(simplePath, { replace: true })
+      library.resetSchemaRegistry()
+    } finally {
+      await fs.rm(simplePath, { force: true })
+    }
+    console.log(`  ✓ Schemas compiled while resetting and re-registering: ${compileCalls.count}`)
+    if (compileCalls.count > 0) {
+      throw new Error('resetting or registering schemas compiles them')
+    }
+    console.log('')
+
     console.log('=== All tests passed! ===')
   } finally {
     if (!hasSpecifiedPath) {
