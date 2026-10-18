@@ -908,6 +908,28 @@ async function runTests () {
     }
     console.log('')
 
+    console.log('Test 26: Rebuilds and uncached builds reuse compiled validators')
+    const compiledCount = () => library.compiledSchemas.size
+    const first = (await library.getSchema('config', { useCache: false })).compiled
+    const before = compiledCount()
+    let reused = true
+    for (let i = 0; i < 20; i++) {
+      reused = reused && (await library.getSchema('config', { useCache: false })).compiled === first
+      library.schemas.config.lastBuildTime = undefined // invalidated, as when an extension is added or removed
+      reused = reused && (await library.getSchema('config')).compiled === first
+    }
+    const after = compiledCount()
+    console.log(`  ✓ Compiled schemas before ${before}, after 20 rounds ${after}`)
+    console.log(`  ✓ Same schema content reuses the same compiled function: ${reused}`)
+    const reordered = library.compileBuilt(Object.fromEntries(Object.entries(library.schemas.config.built).reverse())).compiled === first
+    console.log(`  ✓ The same schema with its keys in another order reuses it too: ${reordered}`)
+    const stillValidates = library.validate('course', { title: 'T' }).title === 'T'
+    console.log(`  ✓ Compiled schemas still validate: ${stillValidates}`)
+    if (after > before || !reused || !reordered || !stillValidates) {
+      throw new Error('identical schema builds are compiled again')
+    }
+    console.log('')
+
     console.log('=== All tests passed! ===')
   } finally {
     if (!hasSpecifiedPath) {
