@@ -732,12 +732,18 @@ async function runTests () {
       }
     }
     const nestedOut = xssSchema.sanitise(nestedInput, { sanitiseHtml: true, strict: false })
+    // stands in for an ObjectId: a non-string object that stringifies to its value
+    const objectIdLike = { toString: () => '6aecafac44f35bd247304a14' }
+    const coercedOut = xssSchema.sanitise({ body: null, title: 42, meta: { author: objectIdLike } }, { sanitiseHtml: true, strict: false })
     const nestedChecks = [
       ['top-level string sanitized (script removed)', !/<script/i.test(nestedOut.body)],
       ['top-level string sanitized (b preserved)', /<b>safe<\/b>/.test(nestedOut.body)],
       ['top-level string sanitized (onerror removed)', !/onerror/i.test(nestedOut.title)],
       ['number field passed through untouched', nestedOut.count === 42],
       ['Date in a string field passed through untouched', nestedOut.updatedAt instanceof Date && nestedOut.updatedAt.toISOString() === '2026-10-06T20:50:00.532Z'],
+      ['null in a string field still coerced to an empty string', coercedOut.body === ''],
+      ['number in a string field still coerced to a string', coercedOut.title === '42'],
+      ['object in a string field still coerced to a string', typeof coercedOut.meta.author === 'string'],
       ['nested string sanitized (iframe escaped)', !/<iframe/i.test(nestedOut.meta.description)],
       ['nested string sanitized (javascript: stripped)', !/javascript:/i.test(nestedOut.meta.author)]
     ]
