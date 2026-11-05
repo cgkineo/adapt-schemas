@@ -234,6 +234,7 @@ async function setupTestSchemas () {
           body: { type: 'string', default: '' },
           title: { type: 'string', default: '' },
           count: { type: 'number', default: 0 },
+          updatedAt: { type: 'string', format: 'date-time', isDate: true },
           customStyle: { type: 'string', default: '', _backboneForms: { type: 'CodeEditor', mode: 'less' } },
           css: { type: 'string', default: '', _adapt: { inputType: 'CodeEditor', options: { mode: 'css' } } },
           json: { type: 'string', default: '', _backboneForms: { type: 'CodeEditor', mode: 'json' } },
@@ -724,6 +725,7 @@ async function runTests () {
       body: '<script>alert("top")</script><b>safe</b>',
       title: '<img src=x onerror=alert(1)>',
       count: 42,
+      updatedAt: new Date('2026-10-06T20:50:00.532Z'),
       meta: {
         description: '<iframe src="evil"></iframe>clean',
         author: '<a href="javascript:bad()">me</a>'
@@ -735,6 +737,7 @@ async function runTests () {
       ['top-level string sanitized (b preserved)', /<b>safe<\/b>/.test(nestedOut.body)],
       ['top-level string sanitized (onerror removed)', !/onerror/i.test(nestedOut.title)],
       ['number field passed through untouched', nestedOut.count === 42],
+      ['Date in a string field passed through untouched', nestedOut.updatedAt instanceof Date && nestedOut.updatedAt.toISOString() === '2026-10-06T20:50:00.532Z'],
       ['nested string sanitized (iframe escaped)', !/<iframe/i.test(nestedOut.meta.description)],
       ['nested string sanitized (javascript: stripped)', !/javascript:/i.test(nestedOut.meta.author)]
     ]
