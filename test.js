@@ -234,6 +234,9 @@ async function setupTestSchemas () {
           body: { type: 'string', default: '' },
           title: { type: 'string', default: '' },
           count: { type: 'number', default: 0 },
+          customStyle: { type: 'string', default: '', _backboneForms: { type: 'CodeEditor', mode: 'less' } },
+          css: { type: 'string', default: '', _adapt: { inputType: 'CodeEditor', options: { mode: 'css' } } },
+          json: { type: 'string', default: '', _backboneForms: { type: 'CodeEditor', mode: 'json' } },
           meta: {
             type: 'object',
             properties: {
@@ -905,6 +908,23 @@ async function runTests () {
     console.log(`  ✓ Filtered builds return isolated Schema instances: ${isolatedFromRegistry}`)
     if (!withLPHas || withoutLPHas || !withLPStillHas || !isolatedFromRegistry) {
       throw new Error('useCache:false did not isolate filtered builds from the registry')
+    }
+    console.log('')
+
+    // Test 26: Less and CSS code fields are not XSS-sanitised
+    console.log('Test 26: Less and CSS code fields keep their source')
+    const less = '.a > .b { color: red; }\n.c:not(.d) > .e { width: ~"calc(100% - 1rem)"; }'
+    const codeOut = xssSchema.sanitise({ customStyle: less, css: less, json: '{"a":"<script>"}', body: '.a > .b' }, { sanitiseHtml: true, strict: false })
+    const codeChecks = [
+      ['Less code editor (_backboneForms) kept as written', codeOut.customStyle === less],
+      ['CSS code editor (_adapt) kept as written', codeOut.css === less],
+      ['JSON code editor still sanitised', !codeOut.json.includes('<script>')],
+      ['plain string still sanitised', codeOut.body === '.a &gt; .b']
+    ]
+    codeChecks.forEach(([desc, ok]) => console.log(`  ${ok ? '✓' : '✗'} ${desc}: ${ok}`))
+    const codeFailed = codeChecks.filter(([, ok]) => !ok)
+    if (codeFailed.length) {
+      throw new Error(`Code field sanitisation failures: ${codeFailed.map(([d]) => d).join(', ')}`)
     }
     console.log('')
 
