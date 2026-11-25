@@ -423,7 +423,17 @@ async function runTests () {
     const hasTitle = paths.includes('title')
     const hasNested = paths.includes('_globals/_accessibility/skipNavigationText')
     console.log(`  ✓ Includes top-level field: ${hasTitle}`)
-    console.log(`  ✓ Includes nested field: ${hasNested}\n`)
+    console.log(`  ✓ Includes nested field: ${hasNested}`)
+    const emptyPropsPaths = courseSchema.walk(
+      { title: 'Test', instruction: 'Text' },
+      val => val.type === 'string',
+      { title: { type: 'string' }, instruction: { type: 'string', properties: {} } }
+    ).map(r => r.path)
+    const hasEmptyProps = emptyPropsPaths.includes('instruction')
+    console.log(`  ✓ Includes field with empty properties: ${hasEmptyProps}\n`)
+    if (!hasEmptyProps) {
+      throw new Error('Schema.walk skipped a field with empty properties')
+    }
 
     // Test 10: Deep defaults on partial nested objects
     console.log('Test 10: Deep defaults on partial nested objects')
